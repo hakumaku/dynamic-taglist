@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<schemalist gettext-domain="workspace-indicator">
+  <schema id="org.gnome.shell.extensions.workspace-indicator" path="/org/gnome/shell/extensions/workspace-indicator/">
+    <key type="b" name="static-workspace">
+      <default>false</default>
+      <summary>Show empty workspace</summary>
+    </key>
+    <key type="b" name="show-icon">
+      <default>false</default>
+      <summary>Show icon instead of number to indicate non-empty workspace</summary>
+    </key>
+  </schema>
+</schemalist>

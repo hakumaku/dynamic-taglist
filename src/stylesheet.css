@@ -1,0 +1,36 @@
+.workspace-panel {
+  padding: 2px 0;
+}
+
+.workspace-indicator {
+  color: #e95420;
+  padding: 0 8px;
+}
+
+.workspace-indicator-icon {
+  /* Control your icon-size with this. */
+  icon-size: 16px;
+}
+
+.workspace-indicator-text {
+  /* Insert padding to match the size of icon. */
+  padding: 0 3px;
+}
+
+.workspace-indicator.empty {
+  color: #ffffff;
+}
+
+.workspace-indicator.empty:hover {
+  color: #e95420;
+}
+
+.workspace-indicator.active:hover {
+  color: #e95420;
+}
+
+/* Active workspace */
+.workspace-indicator.active,
+.workspace-indicator.active.emtpy {
+  border: solid 1px #e95420;
+}
