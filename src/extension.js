@@ -182,8 +182,21 @@ const WorkspaceIndicatorPanelButton = GObject.registerClass(
         this._layout.add_child(indicator);
       });
       this.add_child(this._layout);
-
       // Connect to events
+      this._connect();
+    }
+
+    destroy() {
+      // Disconnect all registered events
+      this._indicators.forEach((indicator) => {
+        indicator.destroy();
+      });
+      // Disconnect all registered events.
+      this._disconnect();
+      super.destroy();
+    }
+
+    _connect() {
       this._active_workspace_changed = workspace_manager.connect_after(
         'active-workspace-changed',
         () => {
@@ -210,17 +223,11 @@ const WorkspaceIndicatorPanelButton = GObject.registerClass(
       );
     }
 
-    destroy() {
-      // Disconnect all registered events
-      this._indicators.forEach((indicator) => {
-        indicator.destroy();
-      });
-      // Disconnect all registered events.
+    _disconnect() {
       workspace_manager.disconnect(this._active_workspace_changed);
       workspace_manager.disconnect(this._workspace_switched);
       workspace_manager.disconnect(this._workspace_added);
       workspace_manager.disconnect(this._workspace_removed);
-      super.destroy();
     }
 
     _update_indicator() {
