@@ -11,7 +11,8 @@ const Me = ExtensionUtils.getCurrentExtension();
 const ExtensionSettings = Me.imports.settings.ExtensionSettings;
 
 // Count windows in the current workspace.
-// Applications such as "Plank" which are placed across all workspaces is not counted.
+// Applications such as "Plank" which are placed across all workspaces is not
+// counted.
 let count_windows = function (workspace) {
   const windows = workspace.list_windows();
   return windows.filter((window) => window.is_on_all_workspaces() === false)
@@ -67,7 +68,6 @@ const WorkspaceIndicator = GObject.registerClass(
       this._active = active;
       this._workspace = workspace;
       this._option = option;
-      this._n_windows = count_windows(workspace);
       this._child = new WorkspaceIndicatorChild(label, workspace);
       // Connect to events to listen.
       this._connect();
@@ -106,12 +106,10 @@ const WorkspaceIndicator = GObject.registerClass(
     }
 
     _window_added_event() {
-      this._n_windows = count_windows(this._workspace);
       this._render();
     }
 
     _window_removed_event() {
-      this._n_windows = count_windows(this._workspace);
       this._render();
     }
 
@@ -127,7 +125,7 @@ const WorkspaceIndicator = GObject.registerClass(
         this.remove_style_class_name('active');
       }
 
-      let is_empty = this._n_windows === 0;
+      let is_empty = count_windows(this._workspace) === 0;
       if (this._option.static_workspace === true) {
         is_empty ? this._show_static_empty() : this._show_static_non_empty();
       } else {
@@ -186,22 +184,28 @@ const WorkspaceIndicatorPanelButton = GObject.registerClass(
       this.add_child(this._layout);
 
       // Connect to events
-      // this._workspaceSwitchedId = workspaceManager.connect_after(
-      //   "workspace-switched",
-      //   this.add_indicators.bind(this)
-      // );
-      this._active_workspace_changed = workspace_manager.connect(
+      this._active_workspace_changed = workspace_manager.connect_after(
         'active-workspace-changed',
         () => {
-          const active_workspace_index =
-            workspace_manager.get_active_workspace_index();
-          this._indicators.forEach((indicator, i) => {
-            if (i === active_workspace_index) {
-              indicator.set_active(true);
-            } else {
-              indicator.set_active(false);
-            }
-          });
+          this._update_indicator();
+        },
+      );
+      this._workspace_switched = workspace_manager.connect_after(
+        'workspace-switched',
+        () => {
+          this._update_indicator();
+        },
+      );
+      this._workspace_added = workspace_manager.connect_after(
+        'workspace-added',
+        () => {
+          this._update_indicator();
+        },
+      );
+      this._workspace_removed = workspace_manager.connect_after(
+        'workspace-removed',
+        () => {
+          this._update_indicator();
         },
       );
     }
@@ -213,7 +217,22 @@ const WorkspaceIndicatorPanelButton = GObject.registerClass(
       });
       // Disconnect all registered events.
       workspace_manager.disconnect(this._active_workspace_changed);
+      workspace_manager.disconnect(this._workspace_switched);
+      workspace_manager.disconnect(this._workspace_added);
+      workspace_manager.disconnect(this._workspace_removed);
       super.destroy();
+    }
+
+    _update_indicator() {
+      const active_workspace_index =
+        workspace_manager.get_active_workspace_index();
+      this._indicators.forEach((indicator, i) => {
+        if (i === active_workspace_index) {
+          indicator.set_active(true);
+        } else {
+          indicator.set_active(false);
+        }
+      });
     }
   },
 );

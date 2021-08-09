@@ -33,7 +33,7 @@ let read_schema = function (schema) {
   return new Gio.Settings({ settings_schema: schema_obj });
 };
 
-class ExtensionSettings {
+var ExtensionSettings = class ExtensionSettings {
   constructor() {
     this.schema = read_schema('org.gnome.shell.extensions.workspace-indicator');
   }
