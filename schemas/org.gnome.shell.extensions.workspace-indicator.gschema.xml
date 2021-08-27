@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="UTF-8"?>
-<schemalist gettext-domain="workspace-indicator">
-  <schema id="org.gnome.shell.extensions.workspace-indicator" path="/org/gnome/shell/extensions/workspace-indicator/">
+<schemalist gettext-domain="dynamic-taglist">
+  <schema id="org.gnome.shell.extensions.dynamic-taglist" path="/org/gnome/shell/extensions/dynamic-taglist/">
     <key type="b" name="static-workspace">
       <default>false</default>
       <summary>Show empty workspace</summary>
@@ -8,6 +8,14 @@
     <key type="b" name="show-icon">
       <default>false</default>
       <summary>Show icon instead of number to indicate non-empty workspace</summary>
+    </key>
+    <key type="s" name="indicator-color">
+      <default>"rgba(233,84,32, 0.8)"</default>
+      <summary>Indicator color</summary>
+    </key>
+    <key type="as" name="window-rule">
+      <default>[]</default>
+      <summary>Window rules</summary>
     </key>
   </schema>
 </schemalist>

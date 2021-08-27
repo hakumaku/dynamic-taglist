@@ -1,9 +1,9 @@
 {
-  "uuid": "gse-workspace-indicator@hakumaku.github.io",
-  "name": "Workspace Indicator",
+  "uuid": "dynamic-taglist@hakumaku.github.io",
+  "name": "Dynamic Taglist",
   "description": "Workspace indicator which makes experience of pop shell better.",
   "shell-version": ["40"],
   "version": 1,
   "original-authors": ["gentlebuuny@gmail.com"],
-  "url": "https://github.com/hakumaku/gse-workspace-indicator"
+  "url": "https://github.com/hakumaku/dynamic-taglist"
 }

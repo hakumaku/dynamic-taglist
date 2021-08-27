@@ -19,6 +19,9 @@ install: build
 
 listen:
 	journalctl -f -o cat /usr/bin/gnome-shell
+
+listen-pref:
+	journalctl -f -o cat /usr/bin/gjs
 	
 format:
 	prettier --write "src/*.js"

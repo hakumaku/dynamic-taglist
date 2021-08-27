@@ -1,10 +1,13 @@
-const { Clutter, GObject, Gtk, Shell, St } = imports.gi;
+'use strict';
+
+const { Clutter, GObject, Gtk, Meta, Shell, St } = imports.gi;
 const Main = imports.ui.main;
 const PanelMenu = imports.ui.panelMenu;
 
 const activities = Main.panel.statusArea.activities;
 const workspace_manager = global.workspace_manager;
 const AppSystem = Shell.AppSystem.get_default();
+const WindowTracker = Shell.WindowTracker.get_default();
 
 const ExtensionUtils = imports.misc.extensionUtils;
 const Me = ExtensionUtils.getCurrentExtension();
@@ -13,33 +16,60 @@ const ExtensionSettings = Me.imports.settings.ExtensionSettings;
 // Count windows in the current workspace.
 // Applications such as "Plank" which are placed across all workspaces is not
 // counted.
-let count_windows = function (workspace) {
-  const windows = workspace.list_windows();
-  return windows.filter((window) => window.is_on_all_workspaces() === false)
-    .length;
+const count_windows = function (workspace) {
+  return workspace
+    .list_windows()
+    .filter((window) => window.is_on_all_workspaces() === false).length;
 };
 
-// Find the first app that is on this workspace, and set icon.
-let get_first_app_icon = function (workspace) {
-  const apps = AppSystem.get_running();
-  let app = apps.find(
-    (app) => app.is_on_workspace(workspace) && typeof app.icon !== 'undefined',
-  );
-  return app ? app.icon : null;
+// Find the first app which is on the given workspace, and return the icon of that.
+const get_first_app_icon = function (workspace) {
+  let apps = workspace.list_windows().reduce((accumulator, window) => {
+    if (window.is_on_all_workspaces() === false) {
+      let app = WindowTracker.get_window_app(window);
+      if (app && app.icon !== undefined) {
+        accumulator.push(app);
+      }
+    }
+    return accumulator;
+  }, []);
+  // You can choose one other than apps[0].
+  return apps.length > 0 ? apps[0].icon : null;
 };
 
+const INDICATOR_STYLE_CSS = `padding: 0 8px;`;
+
+// Contents of a indicator button which holds both St.Text and St.Icon.
 const WorkspaceIndicatorChild = class WorkspaceIndicatorChild {
-  constructor(label, workspace) {
+  constructor(label, workspace, active, show_icon) {
     this._workspace = workspace;
+    this._active = active;
+    this._show_icon = show_icon;
+
     this._text = new St.Label({
       text: label,
+      x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.CENTER,
-      style_class: 'workspace-indicator-text',
+      style: 'padding: 0 3px;',
     });
     this._icon = new St.Icon({
+      icon_size: 16,
+      x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.CENTER,
-      style_class: 'workspace-indicator-icon',
     });
+  }
+  
+  get active() {
+    return this._active;
+  }
+  
+  set active(value) {
+    this._active = value;
+  }
+
+  destroy() {
+    this._icon.destroy();
+    this._text.destroy();
   }
 
   get_text() {
@@ -53,26 +83,20 @@ const WorkspaceIndicatorChild = class WorkspaceIndicatorChild {
     }
     return icon !== null ? this._icon : this._text;
   }
-
-  destroy() {
-    this._icon.destroy();
-    this._text.destroy();
-  }
 };
 
+// A Button that indicates the current state of a workspace.
 const WorkspaceIndicator = GObject.registerClass(
   class WorkspaceIndicator extends St.Button {
     _init(label, active, workspace, option) {
-      super._init();
-      this.add_style_class_name('workspace-indicator');
-      this._active = active;
+      super._init({
+        style: INDICATOR_STYLE_CSS,
+      });
       this._workspace = workspace;
       this._option = option;
-      this._child = new WorkspaceIndicatorChild(label, workspace);
+      this._child = new WorkspaceIndicatorChild(label, workspace, active);
       // Connect to events to listen.
       this._connect();
-
-      this._render();
     }
 
     destroy() {
@@ -82,65 +106,107 @@ const WorkspaceIndicator = GObject.registerClass(
       super.destroy();
     }
 
-    _connect() {
-      this._window_added = this._workspace.connect('window-added', () => {
-        this._window_added_event();
-      });
-      this._window_removed = this._workspace.connect('window-removed', () => {
-        this._window_removed_event();
-      });
-      this._clicked = this.connect('clicked', () => {
-        this._clicked_event();
-      });
-    }
-
-    _disconnect() {
-      this._workspace.disconnect(this._window_added);
-      this._workspace.disconnect(this._window_removed);
-      this.disconnect(this._clicked);
-    }
-
-    set_active(value) {
-      this._active = value;
-      this._render();
-    }
-
-    _window_added_event() {
-      this._render();
-    }
-
-    _window_removed_event() {
-      this._render();
-    }
-
-    _clicked_event() {
-      this._workspace.activate(global.get_current_time());
-    }
-
     // Display indicator based on its state.
-    _render() {
-      if (this._active) {
-        this.add_style_class_name('active');
-      } else {
-        this.remove_style_class_name('active');
-      }
-
+    render() {
       let is_empty = count_windows(this._workspace) === 0;
       if (this._option.static_workspace === true) {
         is_empty ? this._show_static_empty() : this._show_static_non_empty();
       } else {
         is_empty ? this._show_dynamic_empty() : this._show_dynamic_non_empty();
       }
+      this._set_indicator_style(is_empty);
+    }
+
+    set active(value) {
+      this.child._active = value;
+    }
+
+    get active() {
+      return this.child._active;
+    }
+
+    _connect() {
+      this._window_added = this._workspace.connect(
+        'window-added',
+        (workspace, window) => {
+          this._window_added_event(workspace, window);
+        },
+      );
+      this._window_removed = this._workspace.connect(
+        'window-removed',
+        (workspace, window) => {
+          this._window_removed_event(workspace, window);
+        },
+      );
+      this._clicked = this.connect('clicked', () => {
+        this._clicked_event();
+      });
+      // this._enter_event = this.connect('enter-event', (_widget) => {
+      //   // this.set_style(`${INDICATOR_STYLE_CSS}; color: #00ff00;`);
+      // });
+      // this._leave_event = this.connect('leave-event', (_widget) => {
+      //   // this.set_style(`${INDICATOR_STYLE_CSS};`);
+      // });
+    }
+
+    _disconnect() {
+      this._workspace.disconnect(this._window_added);
+      this._workspace.disconnect(this._window_removed);
+      this.disconnect(this._clicked);
+      // this.disconnect(this._enter_event);
+      // this.disconnect(this._leave_event);
+    }
+
+    _window_added_event(_workspace, window) {
+      // Move a window based on rules.
+      // A newly create app does not have "compositor_private" property. (¯\_(ツ)_/¯ god knows why)
+      if (
+        window.is_on_all_workspaces() === false &&
+        window.get_compositor_private() === null
+      ) {
+        const app = AppSystem.lookup_desktop_wmclass(window.get_wm_class());
+        if (app) {
+          const workspace_index = this._option.window_rule.get(app.get_id());
+          // FIXME: index might be not valid, because the number of workspace is not large.
+          if (workspace_index !== undefined) {
+            window.change_workspace_by_index(workspace_index - 1, false);
+          }
+        }
+      }
+
+      // if (window.get_window_type() === Meta.WindowType.Normal) {
+      this.render();
+      // }
+    }
+
+    _window_removed_event(_workspace, window) {
+      // if (window.get_window_type() === Meta.WindowType.Normal) {
+      this.render();
+      // }
+    }
+
+    _clicked_event() {
+      this._workspace.activate(global.get_current_time());
+    }
+
+    _set_indicator_style(empty) {
+      let style = `${INDICATOR_STYLE_CSS}`;
+      const color = this._option.indicator_color.to_string();
+      if (this._active) {
+        style += `border: solid 1px ${color};`;
+      }
+      if (empty === false) {
+        style += `color: ${color};`;
+      }
+      this.set_style(style);
     }
 
     _show_static_empty() {
       this.set_child(this._child.get_text());
-      this.add_style_class_name('empty');
     }
 
     _show_static_non_empty() {
       this._set_non_empty_indicator();
-      this.remove_style_class_name('empty');
     }
 
     _show_dynamic_empty() {
@@ -168,6 +234,7 @@ const WorkspaceIndicator = GObject.registerClass(
   },
 );
 
+// A panel that holds and manages all indicators.
 const WorkspaceIndicatorPanelButton = GObject.registerClass(
   class WorkspaceIndicatorPanelButton extends PanelMenu.Button {
     _init(indicators) {
@@ -175,11 +242,10 @@ const WorkspaceIndicatorPanelButton = GObject.registerClass(
       this._indicators = indicators;
       // Labels are overlapped each other with this Button object only.
       // Create a BoxLayout and append indicators to it.
-      this._layout = new St.BoxLayout({
-        style_class: 'workspace-panel',
-      });
+      this._layout = new St.BoxLayout();
       this._indicators.forEach((indicator) => {
         this._layout.add_child(indicator);
+        indicator.render();
       });
       this.add_child(this._layout);
       // Connect to events
@@ -230,29 +296,17 @@ const WorkspaceIndicatorPanelButton = GObject.registerClass(
       workspace_manager.disconnect(this._workspace_removed);
     }
 
+    // Set a new active workspace whenever workspace-related event is fired.
     _update_indicator() {
       const active_workspace_index =
         workspace_manager.get_active_workspace_index();
       this._indicators.forEach((indicator, i) => {
-        if (i === active_workspace_index) {
-          indicator.set_active(true);
-        } else {
-          indicator.set_active(false);
-        }
+        indicator.active = (i === active_workspace_index); 
+        indicator.render();
       });
     }
   },
 );
-
-function create_indicator(_, i) {
-  let workspace = workspace_manager.get_workspace_by_index(i);
-  return new WorkspaceIndicator(
-    `${i + 1}`,
-    i === this.active_workspace_index,
-    workspace,
-    this.option,
-  );
-}
 
 // gse-workspace-indicator main class
 // It creates or destroys PanelMenu.Button.
@@ -264,12 +318,9 @@ const WorkspaceIndicatorPanel = class WorkspaceIndicatorPanel {
 
   enable() {
     // Connect to events
-    this._schema_changed = this._settings.schema.connect('changed', () => {
-      this.destroy_panel();
-      this.create_panel();
-    });
+    this._connect();
     // Create workspace-indicator.
-    this.create_panel();
+    this._create_panel();
     // Hide activities button.
     if (activities) {
       activities.hide();
@@ -278,28 +329,52 @@ const WorkspaceIndicatorPanel = class WorkspaceIndicatorPanel {
 
   disable() {
     // Disconnect all registered events
-    this._settings.schema.disconnect(this._schema_changed);
+    this._disconnect();
     // Destroy workspace-indicator.
-    this.destroy_panel();
+    this._destroy_panel();
     // Show activities button back.
     if (activities) {
       activities.show();
     }
   }
 
+  _connect() {
+    this._schema_changed = this._settings.schema.connect('changed', () => {
+      this._destroy_panel();
+      this._create_panel();
+    });
+  }
+
+  _disconnect() {
+    this._settings.schema.disconnect(this._schema_changed);
+  }
+
   // Create workspace-indicator object.
-  create_panel() {
+  _create_panel() {
     // Get all workspaces and create a panel.
+    const window_rule = new Map(
+      this._settings.window_rule.map((rule) => rule.split(',')),
+    );
+    const color = this._settings.indicator_color;
+    const active_workspace_index = workspace_manager.get_active_workspace_index();
+
     this._panel = new WorkspaceIndicatorPanelButton(
       Array(workspace_manager.get_n_workspaces())
         .fill(null)
-        .map(create_indicator, {
-          option: {
-            static_workspace: this._settings.get_static_workspace(),
-            show_icon: this._settings.get_show_icon(),
-          },
-          active_workspace_index:
-            workspace_manager.get_active_workspace_index(),
+        .map((_, index) => {
+          const workspace = workspace_manager.get_workspace_by_index(index);
+          const option = {
+            static_workspace: this._settings.static_workspace,
+            show_icon: this._settings.show_icon,
+            indicator_color: color,
+            window_rule: window_rule,
+          };
+          return new WorkspaceIndicator(
+            `${index + 1}`,
+            index === active_workspace_index,
+            workspace,
+            option,
+          );
         }),
     );
     // Attach to the top bar.
@@ -307,7 +382,7 @@ const WorkspaceIndicatorPanel = class WorkspaceIndicatorPanel {
   }
 
   // Destroy workspace-indicator object.
-  destroy_panel() {
+  _destroy_panel() {
     this._panel.destroy();
   }
 };
