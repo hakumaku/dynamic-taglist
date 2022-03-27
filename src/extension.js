@@ -37,7 +37,7 @@ const get_first_app_icon = function (workspace) {
   return apps.length > 0 ? apps[0].icon : null;
 };
 
-const INDICATOR_STYLE_CSS = `padding: 0 8px;`;
+const INDICATOR_STYLE_CSS = `padding: 0 4px;`;
 
 // Contents of a indicator button which holds both St.Text and St.Icon.
 const WorkspaceIndicatorChild = class WorkspaceIndicatorChild {
@@ -50,12 +50,13 @@ const WorkspaceIndicatorChild = class WorkspaceIndicatorChild {
       text: label,
       x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.CENTER,
-      style: 'padding: 0 3px;',
+      style: 'padding: 2 6px;',
     });
     this._icon = new St.Icon({
-      icon_size: 16,
+      icon_size: 22,
       x_align: Clutter.ActorAlign.CENTER,
       y_align: Clutter.ActorAlign.CENTER,
+      style: "margins: 6px"
     });
   }
   

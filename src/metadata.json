@@ -2,7 +2,7 @@
   "uuid": "dynamic-taglist@hakumaku.github.io",
   "name": "Dynamic Taglist",
   "description": "Workspace indicator which makes experience of pop shell better.",
-  "shell-version": ["40"],
+  "shell-version": ["41"],
   "version": 1,
   "original-authors": ["gentlebuuny@gmail.com"],
   "url": "https://github.com/hakumaku/dynamic-taglist"
