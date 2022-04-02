@@ -1,0 +1,8 @@
+{
+  "name": "dynamic-taglist",
+  "description": "Opinionated workspace indicator",
+  "uuid": "gentlebuuny@gmail.com",
+  "shell-version": [
+    "41"
+  ]
+}
