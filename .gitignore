@@ -1,1 +1,6 @@
 _build
+.idea
+@types
+node_modules
+package-lock.json
+package.json
